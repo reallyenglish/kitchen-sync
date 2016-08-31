@@ -50,7 +50,9 @@ module Kitchen
           # because we don't want to --delete that.
           rsync_candidates = locals.select {|path| File.directory?(path) && File.basename(path) != 'cache' }
           ssh_command = "ssh #{ssh_args.join(' ')}"
-          copy_identity
+          # XXX no idea why public key needs to be added to remote
+          # authorized_keys when -i option with vagrant key is passed to ssh
+          # copy_identity
           rsync_cmd = "#{rsync_bin} -e '#{ssh_command}' -az#{logger.level == :debug ? 'vv' : ''} --delete #{rsync_candidates.join(' ')} #{@session.options[:user]}@#{@session.host}:#{remote}"
           logger.debug("[rsync] Running rsync command: #{rsync_cmd}")
           ret = []
