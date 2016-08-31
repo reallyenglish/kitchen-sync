@@ -39,7 +39,8 @@ module Kitchen
 
       class Connection < Ssh::Connection
         def upload(locals, remote)
-          if @rsync_failed || !File.exists?('/usr/bin/rsync')
+          rsync_bin = which('rsync')
+          if @rsync_failed || !rsync_bin
             logger.debug('[rsync] Rsync already failed or not installed, not trying it')
             return super
           end
@@ -50,7 +51,7 @@ module Kitchen
           rsync_candidates = locals.select {|path| File.directory?(path) && File.basename(path) != 'cache' }
           ssh_command = "ssh #{ssh_args.join(' ')}"
           copy_identity
-          rsync_cmd = "/usr/bin/rsync -e '#{ssh_command}' -az#{logger.level == :debug ? 'vv' : ''} --delete #{rsync_candidates.join(' ')} #{@session.options[:user]}@#{@session.host}:#{remote}"
+          rsync_cmd = "#{rsync_bin} -e '#{ssh_command}' -az#{logger.level == :debug ? 'vv' : ''} --delete #{rsync_candidates.join(' ')} #{@session.options[:user]}@#{@session.host}:#{remote}"
           logger.debug("[rsync] Running rsync command: #{rsync_cmd}")
           ret = []
           time = Benchmark.realtime do
@@ -99,6 +100,18 @@ module Kitchen
           args += %W{ -o ForwardAgent=#{options[:forward_agent] ? "yes" : "no"} } if @options.key? :forward_agent
           Array(@options[:keys]).each { |ssh_key| args += %W{ -i #{ssh_key}} }
           args += %W{ -p #{@session.options[:port]}}
+        end
+
+        def which(cmd)
+          exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
+          ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+            exts.each { |ext|
+              exe = File.join(path, "#{cmd}#{ext}")
+              return exe if File.executable?(exe) && !File.directory?(exe)
+            }
+          end
+          logger.warn("[rsync] cannot find #{cmd} in PATH")
+          return nil
         end
       end
 
